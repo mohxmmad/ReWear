@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { 
-  ArrowLeft, 
-  Upload, 
-  Camera, 
-  X, 
-  Plus, 
-  Tag, 
-  Package, 
-  MapPin, 
-  Star, 
+import {
+  ArrowLeft,
+  Upload,
+  Camera,
+  X,
+  Plus,
+  Tag,
+  Package,
+  MapPin,
+  Star,
   Info,
   Check,
   AlertCircle,
@@ -25,7 +25,7 @@ export default function ReWearAddItem() {
     size: '',
     condition: '',
     description: '',
-    pointValue: '',
+    point_value: '',
     color: '',
     material: '',
     tags: [],
@@ -35,6 +35,8 @@ export default function ReWearAddItem() {
   const [currentTag, setCurrentTag] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState(null);
 
   const categories = {
     'Clothing': ['Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Activewear', 'Swimwear', 'Underwear'],
@@ -42,6 +44,11 @@ export default function ReWearAddItem() {
     'Accessories': ['Bags', 'Jewelry', 'Watches', 'Sunglasses', 'Belts', 'Scarves', 'Hats'],
     'Beauty': ['Makeup', 'Skincare', 'Fragrance', 'Hair Care', 'Tools']
   };
+
+  const subcategories = {
+    'Tops': ['T-Shirts', 'Blouses', 'Sweaters', 'Hoodies', 'Tank Tops'],
+    'Bottoms': ['Jeans', 'Skirts', 'Shorts', 'Leggings', 'Trousers'],
+  }
 
   const conditions = [
     { value: 'new', label: 'New with Tags', description: 'Never worn, tags attached' },
@@ -61,9 +68,12 @@ export default function ReWearAddItem() {
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      [field]: value,
+      ...(field === 'category' ? { subcategory: '', size: '' } : {})
     }));
   };
+
+
 
   const handleImageUpload = (files) => {
     const newImages = Array.from(files).map(file => ({
@@ -72,7 +82,7 @@ export default function ReWearAddItem() {
       url: URL.createObjectURL(file),
       name: file.name
     }));
-    
+
     setFormData(prev => ({
       ...prev,
       images: [...prev.images, ...newImages].slice(0, 8) // Max 8 images
@@ -117,7 +127,7 @@ export default function ReWearAddItem() {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleImageUpload(e.dataTransfer.files);
     }
@@ -125,7 +135,7 @@ export default function ReWearAddItem() {
 
   const calculatePointValue = () => {
     let basePoints = 50;
-    
+
     // Condition multiplier
     const conditionMultiplier = {
       'new': 1.5,
@@ -134,7 +144,7 @@ export default function ReWearAddItem() {
       'good': 1.0,
       'fair': 0.8
     };
-    
+
     // Category multiplier
     const categoryMultiplier = {
       'Clothing': 1.0,
@@ -142,12 +152,76 @@ export default function ReWearAddItem() {
       'Accessories': 0.8,
       'Beauty': 0.6
     };
-    
-    const points = Math.round(basePoints * 
-      (conditionMultiplier[formData.condition] || 1) * 
+
+    const points = Math.round(basePoints *
+      (conditionMultiplier[formData.condition] || 1) *
       (categoryMultiplier[formData.category] || 1));
-    
+
     return points;
+  };
+
+  const getCsrfToken = () => {
+    const name = 'csrftoken';
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      const trimmed = cookie.trim();
+      if (trimmed.startsWith(name + '=')) {
+        return trimmed.substring(name.length + 1);
+      }
+    }
+    return null;
+  };
+
+  const handleSubmit = async () => {
+    // Validate required fields
+    if (!formData.title || !formData.category || !formData.condition) {
+      setSubmitStatus({ type: 'error', message: 'Please fill in all required fields' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitStatus(null);
+
+    try {
+      // Prepare form data for API
+      const apiData = {
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        type: formData.subcategory,
+        size: formData.size,
+        condition: formData.condition,
+        tags: formData.tags.join(','),
+        point_value: calculatePointValue(),
+        image: formData.images.length > 0 ? formData.images[0].url : null
+      };
+
+      const response = await fetch('http://localhost:8000/api/items/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCsrfToken()
+        },
+        body: JSON.stringify(apiData),
+        'credentials': 'include'
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setSubmitStatus({ type: 'success', message: 'Item published successfully!' });
+        // Optionally reset form or redirect
+        setTimeout(() => {
+          // Reset form or navigate away
+        }, 2000);
+      } else {
+        throw new Error('Failed to publish item');
+      }
+    } catch (error) {
+      console.error('Error submitting item:', error);
+      setSubmitStatus({ type: 'error', message: 'Failed to publish item. Please try again.' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const ItemPreview = () => (
@@ -207,21 +281,51 @@ export default function ReWearAddItem() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <button 
+              <button
                 onClick={() => setPreviewMode(!previewMode)}
                 className="px-4 py-2 border border-white/20 rounded-lg hover:bg-white/10 transition-colors flex items-center space-x-2"
               >
                 <Eye className="w-4 h-4" />
                 <span>Preview</span>
               </button>
-              <button className="bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-2 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-300 flex items-center space-x-2">
-                <Check className="w-4 h-4" />
-                <span>Publish Item</span>
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-2 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-300 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Publishing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Publish Item</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
         </div>
       </header>
+
+      {/* Status Message */}
+      {submitStatus && (
+        <div className={`max-w-7xl mx-auto px-6 pt-4`}>
+          <div className={`p-4 rounded-lg border flex items-center space-x-3 ${submitStatus.type === 'success'
+            ? 'bg-green-500/20 border-green-400/30 text-green-300'
+            : 'bg-red-500/20 border-red-400/30 text-red-300'
+            }`}>
+            {submitStatus.type === 'success' ? (
+              <Check className="w-5 h-5" />
+            ) : (
+              <AlertCircle className="w-5 h-5" />
+            )}
+            <span>{submitStatus.message}</span>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -233,13 +337,12 @@ export default function ReWearAddItem() {
                 <Camera className="w-5 h-5 mr-2" />
                 Photos ({formData.images.length}/8)
               </h3>
-              
-              <div 
-                className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 ${
-                  dragActive 
-                    ? 'border-purple-400 bg-purple-500/10' 
-                    : 'border-white/20 hover:border-white/30'
-                }`}
+
+              <div
+                className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 ${dragActive
+                  ? 'border-purple-400 bg-purple-500/10'
+                  : 'border-white/20 hover:border-white/30'
+                  }`}
                 onDragEnter={handleDrag}
                 onDragLeave={handleDrag}
                 onDragOver={handleDrag}
@@ -268,8 +371,8 @@ export default function ReWearAddItem() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
                   {formData.images.map((image, index) => (
                     <div key={image.id} className="relative group">
-                      <img 
-                        src={image.url} 
+                      <img
+                        src={image.url}
                         alt={`Upload ${index + 1}`}
                         className="w-full h-24 object-cover rounded-lg"
                       />
@@ -296,7 +399,7 @@ export default function ReWearAddItem() {
                 <Info className="w-5 h-5 mr-2" />
                 Basic Information
               </h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium mb-2">Item Title *</label>
@@ -308,21 +411,25 @@ export default function ReWearAddItem() {
                     className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 focus:outline-none focus:border-purple-400 transition-colors"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-2">Category *</label>
+                  {/* CATEGORY */}
                   <select
                     value={formData.category}
                     onChange={(e) => handleInputChange('category', e.target.value)}
                     className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 focus:outline-none focus:border-purple-400 transition-colors"
                   >
-                    <option value="">Select Category</option>
+                    <option value="" className="text-black bg-white">Select Category</option>
                     {Object.keys(categories).map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
+                      <option key={cat} value={cat} className="text-black bg-white">
+                        {cat}
+                      </option>
                     ))}
                   </select>
+
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-2">Subcategory</label>
                   <select
@@ -331,13 +438,18 @@ export default function ReWearAddItem() {
                     disabled={!formData.category}
                     className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 focus:outline-none focus:border-purple-400 transition-colors disabled:opacity-50"
                   >
-                    <option value="">Select Subcategory</option>
-                    {formData.category && categories[formData.category]?.map(subcat => (
-                      <option key={subcat} value={subcat}>{subcat}</option>
+                    <option value="" className="text-black bg-white">Select Subcategory</option>
+
+                    {(categories[formData.category] || []).map(sub => (
+                      <option key={sub} value={sub} className="text-black bg-white">
+                        {sub}
+                      </option>
                     ))}
                   </select>
+
+
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-2">Brand</label>
                   <input
@@ -348,7 +460,7 @@ export default function ReWearAddItem() {
                     className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 focus:outline-none focus:border-purple-400 transition-colors"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-2">Size</label>
                   <select
@@ -356,11 +468,15 @@ export default function ReWearAddItem() {
                     onChange={(e) => handleInputChange('size', e.target.value)}
                     className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 focus:outline-none focus:border-purple-400 transition-colors"
                   >
-                    <option value="">Select Size</option>
-                    {formData.category && sizes[formData.category]?.map(size => (
-                      <option key={size} value={size}>{size}</option>
+                    <option value="" className="text-black bg-white">Select Size</option>
+
+                    {(sizes[formData.category] || []).map(size => (
+                      <option key={size} value={size} className="text-black bg-white">
+                        {size}
+                      </option>
                     ))}
                   </select>
+
                 </div>
               </div>
             </div>
@@ -371,7 +487,7 @@ export default function ReWearAddItem() {
                 <Star className="w-5 h-5 mr-2" />
                 Condition & Details
               </h3>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Condition *</label>
@@ -394,7 +510,7 @@ export default function ReWearAddItem() {
                     ))}
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">Color</label>
@@ -406,7 +522,7 @@ export default function ReWearAddItem() {
                       className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 focus:outline-none focus:border-purple-400 transition-colors"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium mb-2">Material</label>
                     <input
@@ -418,7 +534,7 @@ export default function ReWearAddItem() {
                     />
                   </div>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-2">Description</label>
                   <textarea
@@ -438,7 +554,7 @@ export default function ReWearAddItem() {
                 <Tag className="w-5 h-5 mr-2" />
                 Tags
               </h3>
-              
+
               <div className="flex flex-wrap gap-2 mb-4">
                 {formData.tags.map(tag => (
                   <span key={tag} className="bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full text-sm flex items-center border border-purple-400/30">
@@ -452,7 +568,7 @@ export default function ReWearAddItem() {
                   </span>
                 ))}
               </div>
-              
+
               <div className="flex space-x-2">
                 <input
                   type="text"
@@ -478,7 +594,7 @@ export default function ReWearAddItem() {
               <h3 className="text-lg font-semibold mb-4">Preview</h3>
               <ItemPreview />
             </div>
-            
+
             <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6">
               <h3 className="text-lg font-semibold mb-4">Point Value</h3>
               <div className="text-center">
@@ -490,7 +606,7 @@ export default function ReWearAddItem() {
                 </p>
               </div>
             </div>
-            
+
             <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6">
               <h3 className="text-lg font-semibold mb-4 flex items-center">
                 <AlertCircle className="w-5 h-5 mr-2 text-yellow-400" />

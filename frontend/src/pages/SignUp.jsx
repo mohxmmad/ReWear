@@ -26,6 +26,18 @@ export default function ReWearRegisterPage() {
     if (error) setError('');
   };
 
+  const getCsrfToken = () => {
+        const name = 'csrftoken';
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+          const trimmed = cookie.trim();
+          if (trimmed.startsWith(name + '=')) {
+            return trimmed.substring(name.length + 1);
+          }
+        }
+        return null;
+      };
+
   const handleSubmit = async () => {
     setIsLoading(true);
     setError('');
@@ -41,6 +53,7 @@ export default function ReWearRegisterPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-CSRFToken': getCsrfToken()
         },
         body: JSON.stringify({
           firstName: formData.firstName,
@@ -48,7 +61,8 @@ export default function ReWearRegisterPage() {
           username: formData.username,
           email: formData.email,
           password: formData.password
-        })
+        }),
+        'credentials': 'include'
       });
 
       const data = await response.json();

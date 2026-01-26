@@ -44,21 +44,43 @@ export default function ReWearDashboard() {
   const [isLoggedIn, setIsLoggedIn] = useState(null); // null: loading, true/false: state
 
   useEffect(() => {
-    const checkLoginStatus = async () => {
-      try {
-        const res = await fetch('http://localhost:8000/api/accounts/islogin');
+  const checkLoginStatus = async () => {
+    try {
+      // Get CSRF token from cookie
+      const getCsrfToken = () => {
+        const name = 'csrftoken';
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+          const trimmed = cookie.trim();
+          if (trimmed.startsWith(name + '=')) {
+            return trimmed.substring(name.length + 1);
+          }
+        }
+        return null;
+      };
+      
+      const csrfToken = getCsrfToken();
+      console.log('CSRF Token:', csrfToken);
+      
+      const res = await fetch('http://localhost:8000/api/accounts/islogin', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(csrfToken && { 'X-CSRFToken': csrfToken })
+        },
+        credentials: 'include' // Important for cookies if using cookie-based auth
+      });
+      
+      const data = await res.json();
+      setIsLoggedIn(data?.is_authenticated || false);
+    } catch (error) {
+      console.error('Error checking login:', error);
+      setIsLoggedIn(false);
+    }
+  };
 
-        const data = await res.json();
-
-        setIsLoggedIn(data?.is_authenticated || false);
-      } catch (error) {
-        console.error('Error checking login:', error);
-        setIsLoggedIn(false);
-      }
-    };
-
-    checkLoginStatus();
-  }, []);
+  checkLoginStatus();
+}, []);
 
   if (isLoggedIn === null) {
     return null; // Or show a loading spinner if needed

@@ -21,17 +21,35 @@ export default function ReWearLoginPage() {
     if (error) setError('');
   };
 
+  const getCsrfToken = () => {
+        const name = 'csrftoken';
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+          const trimmed = cookie.trim();
+          if (trimmed.startsWith(name + '=')) {
+            return trimmed.substring(name.length + 1);
+          }
+        }
+        return null;
+      };
+
   const handleSubmit = async (e) => {
     setIsLoading(true);
     setError('');
 
     try {
+
+      const csrfToken = getCsrfToken();
+      console.log('CSRF Token:', csrfToken);
+
       const response = await fetch('http://localhost:8000/api/accounts/login/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(csrfToken && { 'X-CSRFToken': csrfToken })
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(formData),
+        credentials: 'include'
       });
 
       const data = await response.json();
@@ -191,9 +209,9 @@ export default function ReWearLoginPage() {
           <div className="text-center mt-8">
             <p className="text-gray-300">
               Don't have an account?{' '}
-              <a href="#" className="text-purple-400 hover:text-purple-300 transition-colors font-semibold">
+              <Link to="/signup" className="text-purple-400 hover:text-purple-300 transition-colors font-semibold">
                 Sign up here
-              </a>
+              </Link>
             </p>
           </div>
         </div>

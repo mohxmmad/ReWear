@@ -51,7 +51,6 @@ def create_superuser(request):
     return Response({"detail": "Superuser created successfully."}, status=status.HTTP_201_CREATED)
 
 # ✅ Login View (CSRF exempt)
-@csrf_exempt
 @api_view(['POST'])
 def login_view(request):
     username = request.data.get("username")
@@ -67,7 +66,7 @@ def login_view(request):
     else:
         return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
 
-@csrf_exempt
+
 @api_view(['GET'])
 def login_check(request):
     if request.user.is_authenticated:
