@@ -1,4 +1,4 @@
-# ReWear - Team Bit Lords
+# ReWear
 
 
 **ReWear** is a web-based platform that empowers users to exchange unused clothing through direct swaps or a point-based redemption system. The project promotes **sustainable fashion** and helps reduce **textile waste** by encouraging people to **reuse wearable garments** instead of discarding them.
