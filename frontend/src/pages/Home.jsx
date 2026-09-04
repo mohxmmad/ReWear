@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronLeft, ChevronRight, Star, ArrowRight, Users, Recycle, Shield, Check, Shirt, Package, Heart } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 export default function ReWearLandingPage() {
   const [isVisible, setIsVisible] = useState(false);
@@ -11,19 +12,13 @@ export default function ReWearLandingPage() {
 
   const handleClick = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/accounts/islogin', {
-        credentials: 'include', // Important to send cookies
-      });
-
-      const data = await res.json();
-
-      if (res.ok && data?.is_logged_in) {
-        navigate('/itemListing');
+      const { res, data } = await apiFetch('/api/accounts/islogin/');
+      if (res.ok && (data?.is_logged_in || data?.is_authenticated)) {
+        navigate('/add-item');
       } else {
         navigate('/signup');
       }
     } catch (error) {
-      console.error('Login check failed:', error);
       navigate('/signup');
     }
   };

@@ -6,11 +6,13 @@ __pycache__/
 *.sqlite3
 venv/
 .env
+!.env.example
 
 # Node
 node_modules/
 dist/
 .env.local
+frontend/dist/
 
 # VS Code
 .vscode/

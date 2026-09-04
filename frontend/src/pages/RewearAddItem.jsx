@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Upload,
@@ -15,6 +16,7 @@ import {
   Eye,
   Heart
 } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 export default function ReWearAddItem() {
   const [formData, setFormData] = useState({
@@ -160,65 +162,38 @@ export default function ReWearAddItem() {
     return points;
   };
 
-  const getCsrfToken = () => {
-    const name = 'csrftoken';
-    const cookies = document.cookie.split(';');
-    for (let cookie of cookies) {
-      const trimmed = cookie.trim();
-      if (trimmed.startsWith(name + '=')) {
-        return trimmed.substring(name.length + 1);
-      }
-    }
-    return null;
-  };
+  const navigate = useNavigate();
 
   const handleSubmit = async () => {
-    // Validate required fields
     if (!formData.title || !formData.category || !formData.condition) {
-      setSubmitStatus({ type: 'error', message: 'Please fill in all required fields' });
+      setSubmitStatus({ type: 'error', message: 'Please fill in all required fields (title, category, condition)' });
       return;
     }
-
     setIsSubmitting(true);
     setSubmitStatus(null);
-
     try {
-      // Prepare form data for API
-      const apiData = {
-        title: formData.title,
-        description: formData.description,
-        category: formData.category,
-        type: formData.subcategory,
-        size: formData.size,
-        condition: formData.condition,
-        tags: formData.tags.join(','),
-        point_value: calculatePointValue(),
-        image: formData.images.length > 0 ? formData.images[0].url : null
-      };
-
-      const response = await fetch('http://localhost:8000/api/items/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': getCsrfToken()
-        },
-        body: JSON.stringify(apiData),
-        'credentials': 'include'
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        setSubmitStatus({ type: 'success', message: 'Item published successfully!' });
-        // Optionally reset form or redirect
-        setTimeout(() => {
-          // Reset form or navigate away
-        }, 2000);
+      const fd = new FormData();
+      fd.append('title', formData.title);
+      fd.append('description', formData.description || `${formData.color} ${formData.material}`.trim());
+      fd.append('category', formData.category);
+      fd.append('type', formData.subcategory || formData.type || 'Other');
+      fd.append('size', formData.size || 'M');
+      fd.append('condition', formData.condition);
+      fd.append('tags', formData.tags.join(','));
+      fd.append('point_value', String(calculatePointValue()));
+      if (formData.images.length>0 && formData.images[0].file) {
+        fd.append('image', formData.images[0].file);
+      }
+      const { res, data } = await apiFetch('/api/items/', { method:'POST', body: fd, isFormData:true });
+      if (res.ok) {
+        setSubmitStatus({ type: 'success', message: 'Item submitted for human verification! Admin will review shortly.' });
+        setTimeout(()=> navigate('/landing'), 1500);
       } else {
-        throw new Error('Failed to publish item');
+        const msg = data?.detail || JSON.stringify(data) || 'Failed to publish item';
+        throw new Error(msg);
       }
     } catch (error) {
-      console.error('Error submitting item:', error);
-      setSubmitStatus({ type: 'error', message: 'Failed to publish item. Please try again.' });
+      setSubmitStatus({ type: 'error', message: error.message || 'Failed to publish item. Please try again.' });
     } finally {
       setIsSubmitting(false);
     }

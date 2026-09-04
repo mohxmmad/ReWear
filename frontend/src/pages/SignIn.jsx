@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Shirt, Mail, Lock, Eye, EyeOff, ArrowRight, ChevronLeft } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 export default function ReWearLoginPage() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     username: '',
     password: ''
@@ -17,55 +19,25 @@ export default function ReWearLoginPage() {
       ...prev,
       [name]: value
     }));
-    // Clear error when user starts typing
     if (error) setError('');
   };
 
-  const getCsrfToken = () => {
-        const name = 'csrftoken';
-        const cookies = document.cookie.split(';');
-        for (let cookie of cookies) {
-          const trimmed = cookie.trim();
-          if (trimmed.startsWith(name + '=')) {
-            return trimmed.substring(name.length + 1);
-          }
-        }
-        return null;
-      };
-
-  const handleSubmit = async (e) => {
+  const handleSubmit = async () => {
     setIsLoading(true);
     setError('');
 
     try {
-
-      const csrfToken = getCsrfToken();
-      console.log('CSRF Token:', csrfToken);
-
-      const response = await fetch('http://localhost:8000/api/accounts/login/', {
+      const { res, data } = await apiFetch('/api/accounts/login/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(csrfToken && { 'X-CSRFToken': csrfToken })
-        },
-        body: JSON.stringify(formData),
-        credentials: 'include'
+        body: formData
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        // Handle successful login
-        console.log('Login successful:', data);
-        alert('Login successful!');
-        // You can redirect or store auth token here
-        // Example: localStorage.setItem('token', data.token);
-        
-        window.location.href = 'http://localhost:5173/landing';
+      if (res.ok) {
+        navigate('/landing');
       } else {
-        setError(data.message || 'Login failed. Please try again.');
+        setError(data?.detail || data?.message || 'Login failed. Please try again.');
       }
-    } catch (error) {
+    } catch (e) {
       setError('Network error. Please check your connection and try again.');
     } finally {
       setIsLoading(false);

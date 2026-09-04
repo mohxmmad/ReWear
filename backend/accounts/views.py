@@ -1,35 +1,41 @@
-from django.shortcuts import render
-from dotenv import load_dotenv
-from django.contrib.auth import get_user_model, authenticate, login
-from rest_framework.decorators import api_view
+from django.contrib.auth import get_user_model, authenticate, login, logout
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from django.views.decorators.csrf import csrf_exempt
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 from django.utils.decorators import method_decorator
 import os
+from dotenv import load_dotenv
 
-from .serializers import RegisterSerializer, CompleteProfileSerializer
+from .serializers import RegisterSerializer, CompleteProfileSerializer, UserProfileSerializer
+from .models import UserProfile
 
-# Load environment variables
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 
-# Get the custom user model
 User = get_user_model()
 
-# ✅ Register View (CSRF exempt)
 @method_decorator(csrf_exempt, name='dispatch')
 class RegisterView(APIView):
+    permission_classes = [AllowAny]
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response({"message": "User registered successfully"}, status=status.HTTP_201_CREATED)
+            user = serializer.save()
+            # Auto login after register
+            login(request, user)
+            profile, _ = UserProfile.objects.get_or_create(user=user)
+            return Response({
+                "message": "User registered successfully",
+                "username": user.username,
+                "points": profile.points
+            }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# ✅ Create Superuser (CSRF exempt)
 @csrf_exempt
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def create_superuser(request):
     secret_key = request.data.get("secret_key")
     expected_key = os.getenv("SUPERUSER_SECRET_KEY")
@@ -50,8 +56,8 @@ def create_superuser(request):
     User.objects.create_superuser(username=username, email=email, password=password)
     return Response({"detail": "Superuser created successfully."}, status=status.HTTP_201_CREATED)
 
-# ✅ Login View (CSRF exempt)
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def login_view(request):
     username = request.data.get("username")
     password = request.data.get("password")
@@ -62,27 +68,60 @@ def login_view(request):
     user = authenticate(request, username=username, password=password)
     if user is not None:
         login(request, user)
-        return Response({"detail": "Login successful."}, status=status.HTTP_200_OK)
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+        return Response({
+            "detail": "Login successful.",
+            "username": user.username,
+            "email": user.email,
+            "is_staff": user.is_staff,
+            "points": profile.points
+        }, status=status.HTTP_200_OK)
     else:
         return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
 
+@api_view(['POST'])
+def logout_view(request):
+    logout(request)
+    return Response({"detail": "Logged out successfully."}, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
+@ensure_csrf_cookie
+def get_csrf(request):
+    return Response({"detail": "CSRF cookie set"})
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def login_check(request):
     if request.user.is_authenticated:
-        return Response({"is_authenticated": True, "username": request.user.username}, status=status.HTTP_200_OK)
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        return Response({
+            "is_authenticated": True,
+            "is_logged_in": True,
+            "username": request.user.username,
+            "email": request.user.email,
+            "is_staff": request.user.is_staff,
+            "points": profile.points
+        }, status=status.HTTP_200_OK)
     else:
-        return Response({"is_authenticated": False}, status=status.HTTP_401_UNAUTHORIZED)
-    
-# ✅ Complete Profile View (CSRF exempt)
+        return Response({"is_authenticated": False, "is_logged_in": False}, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+def me_view(request):
+    if not request.user.is_authenticated:
+        return Response({"detail": "Authentication required."}, status=status.HTTP_401_UNAUTHORIZED)
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    serializer = UserProfileSerializer(profile)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
 @csrf_exempt
 @api_view(['POST'])
 def complete_profile(request):
     if not request.user.is_authenticated:
         return Response({"detail": "Authentication required."}, status=status.HTTP_401_UNAUTHORIZED)
-
     serializer = CompleteProfileSerializer(instance=request.user, data=request.data)
     if serializer.is_valid():
         serializer.save()
-        return Response({"message": "Profile completed", "points": request.user.points})
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        return Response({"message": "Profile completed", "points": profile.points, "profile": UserProfileSerializer(profile).data})
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

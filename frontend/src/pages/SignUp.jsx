@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Shirt, Mail, Lock, Eye, EyeOff, ArrowRight, ChevronLeft, User, Sparkles } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 export default function ReWearRegisterPage() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -26,18 +28,6 @@ export default function ReWearRegisterPage() {
     if (error) setError('');
   };
 
-  const getCsrfToken = () => {
-        const name = 'csrftoken';
-        const cookies = document.cookie.split(';');
-        for (let cookie of cookies) {
-          const trimmed = cookie.trim();
-          if (trimmed.startsWith(name + '=')) {
-            return trimmed.substring(name.length + 1);
-          }
-        }
-        return null;
-      };
-
   const handleSubmit = async () => {
     setIsLoading(true);
     setError('');
@@ -49,32 +39,24 @@ export default function ReWearRegisterPage() {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/api/accounts/register/', {
+      const { res, data } = await apiFetch('/api/accounts/register/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': getCsrfToken()
-        },
-        body: JSON.stringify({
+        body: {
           firstName: formData.firstName,
           lastName: formData.lastName,
           username: formData.username,
           email: formData.email,
           password: formData.password
-        }),
-        'credentials': 'include'
+        }
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        alert('Registration successful! Welcome to ReWear!');
-        window.location.href = 'http://localhost:5173/landing';
-        // Redirect or store token here
+      if (res.ok) {
+        navigate('/landing');
       } else {
-        setError(data.message || 'Registration failed. Please try again.');
+        const msg = data?.username?.[0] || data?.email?.[0] || data?.detail || JSON.stringify(data) || 'Registration failed';
+        setError(msg);
       }
-    } catch (error) {
+    } catch (e) {
       setError('Network error. Please check your connection and try again.');
     } finally {
       setIsLoading(false);

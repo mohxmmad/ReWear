@@ -199,9 +199,25 @@ Use the created credentials to log in.
 └── README.md
 ```
 
- ### 📊 Metadata-Based Classification Model
- 
-A machine learning classification model trained using metadata features.  
+  ### 📊 Human Verification (No ML Model)
+  
+  ReWear uses **human moderation** instead of a pretrained model. Every item is `pending` until an admin approves/rejects it in `/admin/panel` (checks for cleanliness, wear, usability). This was chosen over an ML authenticity model for reliability.
 
-📎 [View Google Colab Notebook](https://colab.research.google.com/drive/1_BXgfq69Pnfg9DKTwnTYRFl2gTEqBxVB?usp=sharing)
+  ---
+
+## 🚀 Deployment (Free)
+
+See **[DEPLOY.md](./DEPLOY.md)** for full guide. Quickest:
+
+**Render (all-in-one):** Connect repo → Blueprint uses `render.yaml` → set `VITE_API_URL` to backend URL → create admin via `/api/accounts/create-superuser/` → set `CORS_ALLOWED_ORIGINS` to frontend URL.
+
+**Vercel + Render:** Deploy `frontend` on Vercel (Root: `frontend`, Build: `npm run build`, Output: `dist`, Env: `VITE_API_URL=https://your-backend.onrender.com`), backend on Render as above.
+
+Prod env templates: `backend/.env.example`, `frontend/.env.example`. Docker prod: `docker compose -f docker-compose.prod.yml up --build` (frontend at `:80`, backend at `:8000`).
+
+  ### 📊 Metadata-Based Classification Model
+  
+  A machine learning classification model trained using metadata features.  
+ 
+  📎 [View Google Colab Notebook](https://colab.research.google.com/drive/1_BXgfq69Pnfg9DKTwnTYRFl2gTEqBxVB?usp=sharing)
 

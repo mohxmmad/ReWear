@@ -13,7 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 from dotenv import load_dotenv
 import os
-
+import dj_database_url
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -53,6 +53,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -65,8 +66,10 @@ ROOT_URLCONF = 'core.urls'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.BasicAuthentication',
         'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
     ]
 }
 
@@ -88,19 +91,27 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 
 
-# Database
+# Database - supports DATABASE_URL (Render/Railway) with fallback to Postgres env
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv("POSTGRES_DB", "odoo"),
-        'USER': os.getenv("POSTGRES_USER", "bitlords"),
-        'PASSWORD': os.getenv("POSTGRES_PASSWORD", "odoo@bitlords"),
-        'HOST': os.getenv("DB_HOST", "db"),  # default to "db" service
-        'PORT': '5432', 
+if os.getenv("DATABASE_URL"):
+    DATABASES = {
+        'default': dj_database_url.config(conn_max_age=600, ssl_require=False)
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv("POSTGRES_DB", "odoo"),
+            'USER': os.getenv("POSTGRES_USER", "bitlords"),
+            'PASSWORD': os.getenv("POSTGRES_PASSWORD", "odoo@bitlords"),
+            'HOST': os.getenv("DB_HOST", "db"),
+            'PORT': os.getenv("DB_PORT", "5432"),
+        }
+    }
+    # Fallback to sqlite if postgres not reachable (for quick deploy without DB)
+    # Uncomment to use SQLite locally when DB_HOST not set:
+    # if not os.getenv("DB_HOST"):
+    #     DATABASES['default'] = {'ENGINE': 'django.db.backends.sqlite3', 'NAME': BASE_DIR / 'db.sqlite3'}
 
 
 # Password validation
@@ -125,14 +136,16 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+if os.getenv('CLOUDINARY_CLOUD_NAME') and os.getenv('CLOUDINARY_API_KEY'):
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+    CLOUDINARY_STORAGE = {
+        'CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME'),
+        'API_KEY': os.getenv('CLOUDINARY_API_KEY'),
+        'API_SECRET': os.getenv('CLOUDINARY_API_SECRET'),
+    }
 
-CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME'),
-    'API_KEY': os.getenv('CLOUDINARY_API_KEY'),
-    'API_SECRET': os.getenv('CLOUDINARY_API_SECRET'),
-}
-
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 LANGUAGE_CODE = 'en-us'
 
@@ -145,26 +158,46 @@ USE_TZ = True
 AUTH_USER_MODEL = 'accounts.User'
 
 
-CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+# CORS/CSRF - allow env override for production
+def _csv_env(key, default):
+    val = os.getenv(key)
+    if val:
+        return [v.strip() for v in val.split(",") if v.strip()]
+    return default
 
-CSRF_TRUSTED_ORIGINS = [
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = _csv_env("CORS_ALLOWED_ORIGINS", [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-]
+])
+
+CSRF_TRUSTED_ORIGINS = _csv_env("CSRF_TRUSTED_ORIGINS", [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+])
 
 CORS_ALLOW_CREDENTIALS = True
+
+# In production, HTTPS is expected - set secure cookie options via env
+if not DEBUG:
+    SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "False") == "True"
+    CSRF_COOKIE_SECURE = os.getenv("CSRF_COOKIE_SECURE", "False") == "True"
+    SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
+    CSRF_COOKIE_SAMESITE = os.getenv("CSRF_COOKIE_SAMESITE", "Lax")
+    # Allow CORS to expose cookies with custom frontend domains
+    # Add extra origins via env without code change
 
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Ensure frontend build works when DEBUG=False (collectstatic)
