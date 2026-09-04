@@ -178,14 +178,18 @@ CSRF_TRUSTED_ORIGINS = _csv_env("CSRF_TRUSTED_ORIGINS", [
 
 CORS_ALLOW_CREDENTIALS = True
 
-# In production, HTTPS is expected - set secure cookie options via env
+# In production, HTTPS is expected - cross-site (Vercel -> Render) needs SameSite=None + Secure
 if not DEBUG:
-    SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "False") == "True"
-    CSRF_COOKIE_SECURE = os.getenv("CSRF_COOKIE_SECURE", "False") == "True"
+    SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "True") == "True"
+    CSRF_COOKIE_SECURE = os.getenv("CSRF_COOKIE_SECURE", "True") == "True"
+    SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "None")
+    CSRF_COOKIE_SAMESITE = os.getenv("CSRF_COOKIE_SAMESITE", "None")
+    # Allow frontend on different domain to send cookies
+    CORS_ALLOW_CREDENTIALS = True
+else:
+    # Local dev can stay Lax
     SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
     CSRF_COOKIE_SAMESITE = os.getenv("CSRF_COOKIE_SAMESITE", "Lax")
-    # Allow CORS to expose cookies with custom frontend domains
-    # Add extra origins via env without code change
 
 
 # Static files (CSS, JavaScript, Images)
