@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
+from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt, get_token
 from django.utils.decorators import method_decorator
 import os
 from dotenv import load_dotenv
@@ -56,6 +56,7 @@ def create_superuser(request):
     User.objects.create_superuser(username=username, email=email, password=password)
     return Response({"detail": "Superuser created successfully."}, status=status.HTTP_201_CREATED)
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
@@ -79,6 +80,7 @@ def login_view(request):
     else:
         return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
 
+@csrf_exempt
 @api_view(['POST'])
 def logout_view(request):
     logout(request)
@@ -88,8 +90,10 @@ def logout_view(request):
 @permission_classes([AllowAny])
 @ensure_csrf_cookie
 def get_csrf(request):
-    return Response({"detail": "CSRF cookie set"})
+    token = get_token(request)
+    return Response({"detail": "CSRF cookie set", "csrfToken": token})
 
+@csrf_exempt
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def login_check(request):

@@ -1,9 +1,12 @@
 from rest_framework import generics, permissions, status, serializers
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from .models import SwapRequest
 from .serializers import SwapRequestSerializer
 
+@method_decorator(csrf_exempt, name='dispatch')
 class SwapRequestCreateView(generics.CreateAPIView):
     queryset = SwapRequest.objects.all()
     serializer_class = SwapRequestSerializer
@@ -18,6 +21,7 @@ class SwapRequestCreateView(generics.CreateAPIView):
             raise serializers.ValidationError("You can only offer your own items")
         serializer.save(from_user=self.request.user, to_user=item_requested.uploader)
 
+@method_decorator(csrf_exempt, name='dispatch')
 class SwapRequestListView(generics.ListAPIView):
     serializer_class = SwapRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -26,6 +30,7 @@ class SwapRequestListView(generics.ListAPIView):
         user = self.request.user
         return SwapRequest.objects.filter(from_user=user) | SwapRequest.objects.filter(to_user=user)
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def update_swap_status(request, pk):

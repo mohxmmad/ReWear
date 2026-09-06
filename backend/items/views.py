@@ -1,10 +1,13 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from django.db.models import Q
 from .models import Item
 from .serializers import ItemSerializer
 
+@method_decorator(csrf_exempt, name='dispatch')
 class ItemListCreateView(generics.ListCreateAPIView):
     serializer_class = ItemSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
@@ -31,6 +34,7 @@ class ItemListCreateView(generics.ListCreateAPIView):
         item = serializer.save(uploader=self.request.user, approved=False, status='pending')
         return item
 
+@method_decorator(csrf_exempt, name='dispatch')
 class ItemDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Item.objects.all()
     serializer_class = ItemSerializer
@@ -43,6 +47,7 @@ class ItemDetailView(generics.RetrieveUpdateDestroyAPIView):
             return
         serializer.save(approved=False, status='pending')
 
+@method_decorator(csrf_exempt, name='dispatch')
 class MyItemsView(generics.ListAPIView):
     serializer_class = ItemSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -50,6 +55,7 @@ class MyItemsView(generics.ListAPIView):
     def get_queryset(self):
         return Item.objects.filter(uploader=self.request.user).order_by('-created_at')
 
+@method_decorator(csrf_exempt, name='dispatch')
 class PendingItemsView(generics.ListAPIView):
     serializer_class = ItemSerializer
     permission_classes = [permissions.IsAdminUser]
@@ -57,6 +63,7 @@ class PendingItemsView(generics.ListAPIView):
     def get_queryset(self):
         return Item.objects.filter(approved=False, status='pending').order_by('-created_at')
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([permissions.IsAdminUser])
 def approve_item(request, pk):
@@ -77,6 +84,7 @@ def approve_item(request, pk):
         pass
     return Response(ItemSerializer(item).data)
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([permissions.IsAdminUser])
 def reject_item(request, pk):

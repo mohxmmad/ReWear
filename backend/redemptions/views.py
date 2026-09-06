@@ -1,11 +1,14 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from .models import Redemption
 from .serializers import RedemptionSerializer
 from items.models import Item
 from accounts.models import UserProfile
 
+@method_decorator(csrf_exempt, name='dispatch')
 class RedeemItemView(generics.CreateAPIView):
     serializer_class = RedemptionSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -46,6 +49,7 @@ class RedeemItemView(generics.CreateAPIView):
         redemption = Redemption.objects.create(user=request.user, item=item, points_spent=item.point_value)
         return Response({"message": "Item redeemed successfully.", "redemption": RedemptionSerializer(redemption).data}, status=status.HTTP_201_CREATED)
 
+@method_decorator(csrf_exempt, name='dispatch')
 class RedemptionListView(generics.ListAPIView):
     serializer_class = RedemptionSerializer
     permission_classes = [permissions.IsAuthenticated]
